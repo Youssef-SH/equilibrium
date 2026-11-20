@@ -58,7 +58,10 @@ func poll(now: int) -> void:
 			if not p.socket.was_string_packet(): drop(id,"binary_frame"); break
 			var decoded: Dictionary = Protocol.decode(data)
 			if decoded.error != "":
-				app.reject(id,{},decoded.error)
+				var context: Dictionary = {}
+				if typeof(decoded.get("value")) == TYPE_DICTIONARY and typeof(decoded.value.get("correlation_id")) == TYPE_STRING and Protocol.identifier(decoded.value.correlation_id):
+					context.correlation_id = decoded.value.correlation_id
+				app.reject(id,context,decoded.error)
 			else: app.request(id,decoded.value,now)
 	flush()
 func flush() -> void:

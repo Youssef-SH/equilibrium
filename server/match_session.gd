@@ -5,6 +5,8 @@ const Bots = preload("res://server/bot_controller.gd")
 const Scheduler = preload("res://server/tick_scheduler.gd")
 const View = preload("res://simulation/projections/player_view.gd")
 const Protocol = preload("res://shared/protocol_v1.gd")
+const Presentation = preload("res://server/presentation.gd")
+var presentation = Presentation.new()
 var game = Life.new()
 var gateway = Gateway.new(game)
 var scheduler = Scheduler.new()
@@ -24,6 +26,7 @@ func draft_view() -> Dictionary:
 func view(seat: int) -> Dictionary:
 	var state: Dictionary = game.snapshot()
 	var result: Dictionary = View.project(state,seat)
+	result.presentation = presentation.details(game.engine,state,seat)
 	result.merge({"match_id":state.match_id,"tick":state.tick,"view_seq":view_seq})
 	return Protocol.message("player_view",result)
 func step() -> Dictionary:

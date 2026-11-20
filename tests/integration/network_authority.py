@@ -115,14 +115,18 @@ async def scenario(url, humans):
         assert sum(s['controller']=='bot' for s in lobby['seats'])==4-humans
         p = ps[0]
         for field,value in [('player_id',3),('match_id','fake'),('command_seq',0),('command_id','fake'),('server_received_tick',0),('seat',3)]:
-            await p.send('submit_action',action_id='spoof',kind='set_reduce_waste',payload={'enabled':False},**{field:value})
-            assert (await p.wait('protocol_error'))['code']=='invalid_fields'
+            correlation = await p.send('submit_action',action_id='spoof',kind='set_reduce_waste',payload={'enabled':False},**{field:value})
+            error = await p.wait('protocol_error')
+            assert error['code']=='invalid_fields' and error['correlation_id']==correlation
         await p.send('submit_action',action_id='policy',kind='set_reduce_waste',payload={'enabled':True})
         assert (await p.wait('action_ack',lambda m:m['action_id']=='policy' and m['phase']=='execution'))['status']=='applied'
         await p.send('submit_action',action_id='policy',kind='set_reduce_waste',payload={'enabled':False})
         assert (await p.wait('action_ack',lambda m:m['action_id']=='policy'))['status']=='action_id_conflict'
         await p.send('advance',seconds=100)
         assert (await p.wait('protocol_error'))['code']=='unknown_message'
+        # Close immediately after submission, before observing any admission.
+        uncertain_payload = {'building_type':'residential_district','tile':30}
+        await p.send('submit_action', action_id='uncertain-build', kind='construct', payload=uncertain_payload)
         # Real disconnect/rejoin, credential rotation and retained acknowledgment recovery.
         await p.ws.close()
         re = await peer(url)
@@ -134,6 +138,11 @@ async def scenario(url, humans):
         safe(v,new['seat'])
         assert v['tick']>=1
         assert (await re.wait('action_ack',lambda m:m['action_id']=='policy' and m['phase']=='execution'))['status']=='applied'
+        await re.send('submit_action', action_id='uncertain-build', kind='construct', payload=uncertain_payload)
+        receipt = await re.wait('action_ack', lambda m:m['action_id']=='uncertain-build' and m['phase']=='execution')
+        assert receipt['status']=='applied'
+        built = await re.wait('player_view', lambda m:any(b['tile']==30 for b in m['own_city']['buildings']))
+        assert sum(b['tile']==30 for b in built['own_city']['buildings']) == 1
         thief = await peer(url)
         await thief.send('rejoin',lobby_id=credentials[0]['lobby_id'],rejoin_token=credentials[0]['rejoin_token'])
         assert (await thief.wait('protocol_error'))['code']=='authentication_failed'

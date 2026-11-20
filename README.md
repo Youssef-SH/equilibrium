@@ -31,16 +31,16 @@ Godot 4.5.1 runs the authoritative simulation without scenes, rendering or wall-
 - `simulation/match.gd` composes the complete production engine.
 - `server/` hosts the authoritative multiplayer runtime.
 - `shared/` defines the versioned WebSocket JSON protocol.
-- `client/terminal/` contains the minimal network CLI.
+- `client/terminal/` contains the interactive network TUI and scripted CLI.
 
 See [architecture](docs/architecture.md) and [deterministic execution](docs/deterministic-execution.md).
 
 ## Requirements
 
 - Godot 4.5.1
-- Python 3.9 or later for the static repository checker and optional network terminal client
+- Python 3.13.x exclusively for the static repository checker and optional network terminal client
 
-The engine and repository checker need no Python packages. The optional terminal client requires the pinned dependency in `client/terminal/requirements.txt`.
+The engine needs no Python packages. The repository checker, terminal client and Python tests use the locked uv environment in `pyproject.toml` and `uv.lock`.
 
 ## Run headlessly
 
@@ -58,6 +58,16 @@ godot --headless --path . --script simulation/headless_runner.gd -- 42 1200
 
 It prints the canonical serialized state. The runner uses an explicit demonstration Foundation assignment; lifecycle drafting is available through the engine interface.
 
+## Interactive multiplayer
+
+Start the [authoritative server](server/README.md#run), install the [terminal dependencies](client/terminal/README.md#install-and-launch), then open the interactive client:
+
+~~~sh
+uv run --locked python client/terminal/client.py --tui
+~~~
+
+Create or join a private room from the menu. City construction, waste and energy, trading, rankings, reconnection and final results use guided controls. The [terminal guide](client/terminal/README.md) includes separate-client launch commands and the four-person acceptance procedure.
+
 ## Engine integration
 
 Integrators can instantiate `simulation/match.gd` directly and use its initialization, command, stepping, snapshot and serialization boundary. `simulation/interfaces/lifecycle.gd` adds deterministic unique-Foundation drafting. `simulation/interfaces/local_protocol.gd` provides a local JSON-lines protocol through `tools/local_match.gd`.
@@ -72,7 +82,7 @@ See [engine interface](docs/engine-interface.md) for envelopes, operations and s
 
 ```sh
 godot --headless --path . --log-file /tmp/equilibrium-tests.log --script tests/run_all.gd
-python3 tools/check_repository.py
+uv run --locked python tools/check_repository.py
 ```
 
 The Godot entry point runs production regression suites, opening checks and five independent-process 1,200-tick replay comparisons. The Python checker performs static resource, dependency-boundary, UID, documentation-link and B1-structure checks. See [testing](docs/testing.md) for focused commands.

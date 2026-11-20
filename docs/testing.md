@@ -15,7 +15,7 @@ Coverage includes initialization, command ordering, fixed-point arithmetic, cons
 ## Static repository check
 
 ```sh
-python3 tools/check_repository.py
+uv run --locked python tools/check_repository.py
 ```
 
 The checker verifies retained Godot resource paths, production dependency boundaries, `.gd.uid` pairing, Markdown links and the canonical B1 catalogue/structural shape. It uses only the Python standard library.
@@ -34,8 +34,10 @@ godot --headless --path . --script tests/integration/local_protocol.gd
 
 ## Online multiplayer
 
-The [server checks](../server/README.md#checks) cover protocol/schema agreement, authorization, scheduling, recursive player-view privacy, draft disconnect recovery, a complete marketplace settlement, real socket fixtures for all four human/bot occupancy combinations, and the terminal CLI. The complete injected-clock application test is a separate, longer check. Full-duration completion over continuously connected sockets is not accelerated through the public protocol.
+The [server checks](../server/README.md#checks) cover protocol/schema agreement, authorization, scheduling, recursive player-view privacy, draft disconnect recovery, a complete marketplace settlement, real socket fixtures for all four human/bot occupancy combinations, and the terminal CLI. The [interactive client checks](../client/terminal/README.md#focused-checks) additionally exercise authenticated read-only previews, formatting, form stability and actual TUI controls over loopback sockets. Fixture-based final-results rendering is distinct from completing a live match. The complete injected-clock application test is a separate, longer check. Full-duration completion over continuously connected sockets is not accelerated through the public protocol.
 
 ## Clean import
 
 For publication checks, copy retained source into a clean directory without `.godot/`, local environments or outputs, then run a Godot headless import and the complete suite. Retain `.gd.uid` sidecars with their scripts.
+
+Install and verify the exact locked runtime and test dependencies with `uv sync --locked --group test` and `uv lock --check`.

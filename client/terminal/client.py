@@ -8,38 +8,47 @@ import uuid
 import threading
 import sys
 
-from websockets.asyncio.client import connect
+if sys.version_info[:2] != (3, 13):
+    raise SystemExit("EQUILIBRIUM requires Python 3.13.x. Launch with python3.13 or py -3.13.")
+
+from network import connect, send as send_wire, save_session, load_session, session_data
 
 
 async def run(args):
     credentials = Path(args.session_file) if args.session_file else None
     async with connect(args.url, max_size=1048576, proxy=None) as socket:
         async def send(message_type, **fields):
-            await socket.send(json.dumps(dict(v=1, type=message_type, correlation_id=uuid.uuid4().hex, **fields)))
+            await send_wire(socket, message_type, **fields)
 
         await send("hello", client="terminal", client_version="1.0")
         welcome = json.loads(await socket.recv())
         if welcome["type"] != "welcome":
-            raise RuntimeError(welcome)
+            raise RuntimeError("Server rejected protocol negotiation.")
         if args.rejoin:
             if not credentials:
                 raise ValueError("--rejoin requires --session-file")
-            saved = json.loads(credentials.read_text())
+            saved = load_session(credentials)
             await send("rejoin", lobby_id=saved["lobby_id"], rejoin_token=saved["rejoin_token"])
         elif args.create:
             await send("create_lobby")
         elif args.join:
             await send("join_lobby", join_code=args.join)
 
+        current_credentials = None
+        async def persist():
+            if credentials and current_credentials:
+                try:
+                    save_session(credentials, current_credentials)
+                except (OSError, ValueError):
+                    print("Session not saved. Keep this process open; use save-session to retry.", file=sys.stderr, flush=True)
+
         async def receive():
+            nonlocal current_credentials
             async for raw in socket:
                 m = json.loads(raw)
                 if m["type"] == "seat_assigned":
-                    if credentials:
-                        fd = os.open(credentials, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
-                        with os.fdopen(fd, "w") as out:
-                            os.fchmod(out.fileno(), 0o600)
-                            json.dump({k: m[k] for k in ("lobby_id", "rejoin_token")}, out)
+                    current_credentials = session_data(m)
+                    await persist()
                     m = {k: v for k, v in m.items() if k != "rejoin_token"}
                 if m["type"] == "player_view" and not args.json:
                     c = m["own_city"]
@@ -79,14 +88,16 @@ async def run(args):
         threading.Thread(target=read_input, daemon=True).start()
 
         async def commands():
-            print('Commands: ready | unready | start | foundation ID | action KIND JSON | quit', flush=True)
+            print('Commands: ready | unready | start | foundation ID | action KIND JSON | save-session | quit', flush=True)
             while True:
                 line = await lines.get()
                 if line is None:
                     await socket.close()
                     return
                 command, _, value = line.strip().partition(" ")
-                if command == "quit":
+                if command == "save-session":
+                    await persist()
+                elif command == "quit":
                     await socket.close()
                     return
                 if command in ("ready", "unready"):
@@ -120,7 +131,12 @@ def main():
     group.add_argument("--rejoin", action="store_true")
     p.add_argument("--session-file", help="Private credential file, created with mode 0600")
     p.add_argument("--json", action="store_true")
+    p.add_argument("--tui", action="store_true", help="Launch the interactive network client")
     args = p.parse_args()
+    if args.tui:
+        from tui import EquilibriumApp
+        EquilibriumApp(args).run()
+        return
     try:
         asyncio.run(run(args))
     except (KeyboardInterrupt, EOFError):

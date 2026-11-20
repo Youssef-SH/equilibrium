@@ -3,6 +3,7 @@ const Decoder = preload("res://shared/strict_json.gd")
 const Canonical = preload("res://simulation/core/canonical.gd")
 const FIELDS = {
 	"hello":{"client":TYPE_STRING,"client_version":TYPE_STRING},
+	"get_catalogue":{}, "preview_action":{"kind":TYPE_STRING,"payload":TYPE_DICTIONARY},
 	"create_lobby":{}, "join_lobby":{"join_code":TYPE_STRING},
 	"set_ready":{"ready":TYPE_BOOL}, "start_match":{},
 	"choose_foundation":{"action_id":TYPE_STRING,"foundation":TYPE_STRING},
@@ -49,7 +50,7 @@ static func validate(m: Dictionary) -> String:
 	if m.has("action_id") and not identifier(m.action_id): return "invalid_identifier"
 	if m.has("observed_tick") and (m.observed_tick < 0 or m.observed_tick > 1200): return "invalid_tick"
 	if m.type == "hello" and (m.client not in ["terminal","godot","test"] or m.client_version.length() > 64): return "invalid_client"
-	if m.type == "submit_action": return payload_error(m.kind,m.payload)
+	if m.type in ["submit_action","preview_action"]: return payload_error(m.kind,m.payload)
 	return ""
 
 static func payload_error(kind: String, p: Dictionary) -> String:

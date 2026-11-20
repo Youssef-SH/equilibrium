@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.13
 """Statically check retained resources, documentation links, UIDs, and B1 shape."""
 import json
 import re

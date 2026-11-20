@@ -266,6 +266,6 @@ func schema_conformance() -> void:
 		server_types.append(definition.properties.type.const)
 		check(definition.get("additionalProperties",true)==false,"server schema closes fields")
 	server_types.sort()
-	var expected_server: Array = ["welcome","protocol_error","seat_assigned","lobby_created","lobby_state","draft_state","match_started","action_ack","player_view","match_cancelled","match_finished"]
+	var expected_server: Array = ["welcome","protocol_error","seat_assigned","lobby_created","lobby_state","draft_state","match_started","action_ack","player_view","match_cancelled","match_finished","catalogue","action_preview"]
 	expected_server.sort()
 	check(server_types==expected_server,"schema server message types")

@@ -1008,6 +1008,652 @@
             "payload"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "get_catalogue"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "construct"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "building_type": {
+                  "type": "string",
+                  "maxLength": 1024
+                },
+                "tile": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 35
+                }
+              },
+              "required": [
+                "building_type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "set_reduce_waste"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "upgrade"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "building_id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "building_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "disable"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "building_id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "building_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "enable"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "building_id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "building_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "demolish"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "building_id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "building_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "cancel_project"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "building_id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "building_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "withdraw_offer"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "accept_quote"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "renew_contract"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "cancel_contract"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "publish_offer"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "maxLength": 1024
+                },
+                "rate": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                },
+                "price": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "type",
+                "rate",
+                "price"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "submit_quote"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "maxLength": 1024
+                },
+                "rate": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                },
+                "price": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                },
+                "request_id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "type",
+                "rate",
+                "price",
+                "request_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "preview_action"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "kind": {
+              "const": "request_quotes"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "maxLength": 1024
+                },
+                "rate": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000000000
+                }
+              },
+              "required": [
+                "type",
+                "rate"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -1356,6 +2002,92 @@
                 "object",
                 "null"
               ]
+            },
+            "presentation": {
+              "type": "object",
+              "properties": {
+                "buildings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "effects": {
+                        "$ref": "#/$defs/buildingEffects"
+                      },
+                      "efficiency_micro": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "effects",
+                      "efficiency_micro"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "conditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "condition": {
+                        "type": "string"
+                      },
+                      "severity": {
+                        "type": "string"
+                      },
+                      "cause": {
+                        "type": "string"
+                      },
+                      "effect": {
+                        "type": "string"
+                      },
+                      "relation": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "condition",
+                      "severity",
+                      "cause",
+                      "effect",
+                      "relation"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "last_migration_delta": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "next_migration": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "collection_micro_per_minute": {
+                  "type": "integer"
+                },
+                "landfill_micro_per_minute": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "buildings",
+                "conditions",
+                "last_migration_delta",
+                "next_migration",
+                "collection_micro_per_minute",
+                "landfill_micro_per_minute"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -1431,8 +2163,785 @@
             "rankings"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "catalogue"
+            },
+            "correlation_id": {
+              "type": "string"
+            },
+            "buildings": {
+              "type": "object",
+              "properties": {
+                "residential_district": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "factory": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "commercial_district": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "public_services_center": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "recovery_hub": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "recycling_center": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "biogas_facility": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "landfill": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "fossil_power_plant": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "renewable_power_plant": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                },
+                "green_space": {
+                  "type": "object",
+                  "properties": {
+                    "build_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "upgrade_unlock_micro": {
+                      "type": "integer"
+                    },
+                    "l1": {
+                      "$ref": "#/$defs/buildingEffects"
+                    },
+                    "upgrade_delta": {
+                      "$ref": "#/$defs/buildingEffects"
+                    }
+                  },
+                  "required": [
+                    "build_unlock_micro",
+                    "upgrade_unlock_micro",
+                    "l1",
+                    "upgrade_delta"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "residential_district",
+                "factory",
+                "commercial_district",
+                "public_services_center",
+                "recovery_hub",
+                "recycling_center",
+                "biogas_facility",
+                "landfill",
+                "fossil_power_plant",
+                "renewable_power_plant",
+                "green_space"
+              ],
+              "additionalProperties": false
+            },
+            "foundations": {
+              "type": "object",
+              "properties": {
+                "industrial_legacy": {
+                  "type": "object",
+                  "properties": {
+                    "money": {
+                      "type": "integer"
+                    },
+                    "building": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "money",
+                    "building"
+                  ],
+                  "additionalProperties": false
+                },
+                "circular_foundation": {
+                  "type": "object",
+                  "properties": {
+                    "money": {
+                      "type": "integer"
+                    },
+                    "building": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "money",
+                    "building"
+                  ],
+                  "additionalProperties": false
+                },
+                "energy_pioneer": {
+                  "type": "object",
+                  "properties": {
+                    "money": {
+                      "type": "integer"
+                    },
+                    "building": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "money",
+                    "building"
+                  ],
+                  "additionalProperties": false
+                },
+                "investment_district": {
+                  "type": "object",
+                  "properties": {
+                    "money": {
+                      "type": "integer"
+                    },
+                    "building": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "money",
+                    "building"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "industrial_legacy",
+                "circular_foundation",
+                "energy_pioneer",
+                "investment_district"
+              ],
+              "additionalProperties": false
+            },
+            "prices": {
+              "type": "object",
+              "properties": {
+                "recyclable": {
+                  "type": "object",
+                  "properties": {
+                    "minimum": {
+                      "type": "integer"
+                    },
+                    "maximum": {
+                      "type": "integer"
+                    },
+                    "step": {
+                      "type": "integer"
+                    },
+                    "standard": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minimum",
+                    "maximum",
+                    "step",
+                    "standard"
+                  ],
+                  "additionalProperties": false
+                },
+                "organic": {
+                  "type": "object",
+                  "properties": {
+                    "minimum": {
+                      "type": "integer"
+                    },
+                    "maximum": {
+                      "type": "integer"
+                    },
+                    "step": {
+                      "type": "integer"
+                    },
+                    "standard": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minimum",
+                    "maximum",
+                    "step",
+                    "standard"
+                  ],
+                  "additionalProperties": false
+                },
+                "electricity": {
+                  "type": "object",
+                  "properties": {
+                    "minimum": {
+                      "type": "integer"
+                    },
+                    "maximum": {
+                      "type": "integer"
+                    },
+                    "step": {
+                      "type": "integer"
+                    },
+                    "standard": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minimum",
+                    "maximum",
+                    "step",
+                    "standard"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "recyclable",
+                "organic",
+                "electricity"
+              ],
+              "additionalProperties": false
+            },
+            "rules": {
+              "type": "object",
+              "properties": {
+                "micro_units": {
+                  "type": "integer"
+                },
+                "match_seconds": {
+                  "type": "integer"
+                },
+                "grid_width": {
+                  "type": "integer"
+                },
+                "grid_height": {
+                  "type": "integer"
+                },
+                "construction_slots": {
+                  "type": "integer"
+                },
+                "migration_first_second": {
+                  "type": "integer"
+                },
+                "migration_interval_seconds": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "micro_units",
+                "match_seconds",
+                "grid_width",
+                "grid_height",
+                "construction_slots",
+                "migration_first_second",
+                "migration_interval_seconds"
+              ],
+              "additionalProperties": false
+            },
+            "policy": {
+              "type": "object",
+              "properties": {
+                "policy_fee_micro_per_minute": {
+                  "type": "integer"
+                },
+                "policy_cooldown_seconds": {
+                  "type": "integer"
+                },
+                "policy_factory_income_percent": {
+                  "type": "integer"
+                },
+                "policy_commerce_income_percent": {
+                  "type": "integer"
+                },
+                "cancel_refund_percent": {
+                  "type": "integer"
+                },
+                "demolition_refund_micro": {
+                  "type": "integer"
+                },
+                "policy_household_percent": {
+                  "type": "integer"
+                },
+                "policy_factory_percent": {
+                  "type": "integer"
+                },
+                "policy_commerce_percent": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "policy_fee_micro_per_minute",
+                "policy_cooldown_seconds",
+                "policy_factory_income_percent",
+                "policy_commerce_income_percent",
+                "cancel_refund_percent",
+                "demolition_refund_micro",
+                "policy_household_percent",
+                "policy_factory_percent",
+                "policy_commerce_percent"
+              ],
+              "additionalProperties": false
+            },
+            "market": {
+              "type": "object",
+              "properties": {
+                "duration": {
+                  "type": "integer"
+                },
+                "minimum_remaining": {
+                  "type": "integer"
+                },
+                "booking_micro": {
+                  "type": "integer"
+                },
+                "quote_seconds": {
+                  "type": "integer"
+                },
+                "selection_seconds": {
+                  "type": "integer"
+                },
+                "expiry_warning": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "duration",
+                "minimum_remaining",
+                "booking_micro",
+                "quote_seconds",
+                "selection_seconds",
+                "expiry_warning"
+              ],
+              "additionalProperties": false
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "warning": {
+                    "type": "integer"
+                  },
+                  "start": {
+                    "type": "integer"
+                  },
+                  "end": {
+                    "type": "integer"
+                  },
+                  "modifiers": {
+                    "type": "object",
+                    "properties": {
+                      "air_percent": {
+                        "type": "integer"
+                      },
+                      "household_percent": {
+                        "type": "integer"
+                      },
+                      "factory_percent": {
+                        "type": "integer"
+                      },
+                      "commerce_percent": {
+                        "type": "integer"
+                      },
+                      "municipal_E": {
+                        "type": "integer"
+                      },
+                      "uncollected_penalty_micro": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "id",
+                  "warning",
+                  "start",
+                  "end",
+                  "modifiers"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "buildings",
+            "foundations",
+            "prices",
+            "rules",
+            "policy",
+            "market",
+            "events"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "v": {
+              "const": 1
+            },
+            "type": {
+              "const": "action_preview"
+            },
+            "correlation_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "status": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "tick": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "payload": {
+              "type": "object"
+            },
+            "purchase": {
+              "type": "object",
+              "properties": {
+                "base_cost_micro": {
+                  "type": "integer"
+                },
+                "cash_micro": {
+                  "type": "integer"
+                },
+                "materials_micro": {
+                  "type": "integer"
+                },
+                "duration_seconds": {
+                  "type": "integer"
+                },
+                "unlock_micro": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "base_cost_micro",
+                "cash_micro",
+                "materials_micro",
+                "duration_seconds",
+                "unlock_micro"
+              ],
+              "additionalProperties": false
+            },
+            "effects": {
+              "$ref": "#/$defs/buildingEffects"
+            }
+          },
+          "required": [
+            "v",
+            "type",
+            "correlation_id",
+            "status",
+            "tick",
+            "kind",
+            "payload"
+          ],
+          "additionalProperties": false
         }
       ]
+    },
+    "buildingEffects": {
+      "type": "object",
+      "properties": {
+        "cost_micro": {
+          "type": "integer"
+        },
+        "duration_seconds": {
+          "type": "integer"
+        },
+        "upkeep_micro_per_minute": {
+          "type": "integer"
+        },
+        "jobs": {
+          "type": "integer"
+        },
+        "demand_micro_E": {
+          "type": "integer"
+        },
+        "generation_micro_E": {
+          "type": "integer"
+        },
+        "income_micro_per_minute": {
+          "type": "integer"
+        },
+        "air_micro_per_minute": {
+          "type": "integer"
+        },
+        "housing": {
+          "type": "integer"
+        },
+        "services": {
+          "type": "integer"
+        },
+        "collection_per_minute": {
+          "type": "integer"
+        },
+        "recycling_per_minute": {
+          "type": "integer"
+        },
+        "reuse_per_minute": {
+          "type": "integer"
+        },
+        "treatment_per_minute": {
+          "type": "integer"
+        },
+        "waste_per_minute": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cost_micro",
+        "duration_seconds",
+        "upkeep_micro_per_minute",
+        "jobs",
+        "demand_micro_E",
+        "generation_micro_E",
+        "income_micro_per_minute",
+        "air_micro_per_minute",
+        "housing",
+        "services",
+        "collection_per_minute",
+        "recycling_per_minute",
+        "reuse_per_minute",
+        "treatment_per_minute",
+        "waste_per_minute"
+      ],
+      "additionalProperties": false
     }
   }
 }

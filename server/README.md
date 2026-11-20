@@ -34,20 +34,20 @@ Bots reuse `LocalBot.PLAN`: one candidate construction every 90 ticks, submitted
 
 ```sh
 godot --headless --path . --log-file /tmp/equilibrium-online-tests.log --script tests/integration/online_foundation.gd
-python3 tools/check_repository.py
+uv run --locked python tools/check_repository.py
 ```
 
-After installing the terminal requirements in a virtual environment, run real socket cases separately:
+After installing the terminal requirements in the Python 3.13 `.venv`, run real socket cases separately:
 
 ```sh
-python tests/integration/network_authority.py --humans 2
-python tests/integration/network_authority.py --humans 1
-python tests/integration/network_authority.py --humans 3
-python tests/integration/network_authority.py --humans 4
-python tests/integration/network_authority.py --humans 0
-python tests/integration/network_authority.py --marketplace
-python tests/integration/network_authority.py --draft-disconnect
-python tests/integration/network_authority.py --terminal
+uv run --locked --group test python tests/integration/network_authority.py --humans 2
+uv run --locked --group test python tests/integration/network_authority.py --humans 1
+uv run --locked --group test python tests/integration/network_authority.py --humans 3
+uv run --locked --group test python tests/integration/network_authority.py --humans 4
+uv run --locked --group test python tests/integration/network_authority.py --humans 0
+uv run --locked --group test python tests/integration/network_authority.py --marketplace
+uv run --locked --group test python tests/integration/network_authority.py --draft-disconnect
+uv run --locked --group test python tests/integration/network_authority.py --terminal
 ```
 
 `--humans 0` selects transport/host-departure edge tests; it is not a supported zero-human lobby. Each case launches a real server, creates independent WebSocket connections and requests graceful shutdown. It fails nonzero on assertion, timeout, server script error or abnormal shutdown.

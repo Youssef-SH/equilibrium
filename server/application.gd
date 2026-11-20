@@ -3,6 +3,8 @@ extends RefCounted
 const Protocol = preload("res://shared/protocol_v1.gd")
 const Sessions = preload("res://server/session_registry.gd")
 const MatchSession = preload("res://server/match_session.gd")
+const Presentation = preload("res://server/presentation.gd")
+var presentation = Presentation.new()
 const Bots = preload("res://server/bot_controller.gd")
 var sessions = Sessions.new()
 var connections: Dictionary = {}
@@ -83,6 +85,15 @@ func request(id: int, m: Dictionary, now: int) -> void:
 		return
 	if seat < 0: reject(id,m,"not_seated"); return
 	match m.type:
+		"get_catalogue":
+			var catalogue: Dictionary = presentation.catalogue()
+			catalogue.correlation_id = m.correlation_id
+			emit(id,"catalogue",catalogue)
+		"preview_action":
+			if phase != "running" or match_session == null: reject(id,m,"invalid_phase"); return
+			var preview: Dictionary = presentation.preview(match_session.game.engine,seat,m.kind,m.payload)
+			preview.correlation_id = m.correlation_id
+			emit(id,"action_preview",preview)
 		"set_ready":
 			if phase != "waiting": reject(id,m,"invalid_phase"); return
 			if seats[seat].ready != m.ready:
