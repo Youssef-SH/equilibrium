@@ -1,6 +1,8 @@
 """Interactive, server-authoritative EQUILIBRIUM client."""
 import asyncio
 import json
+import re
+import traceback
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,8 +13,10 @@ from textual.containers import Horizontal, VerticalScroll, Container
 from textual.screen import ModalScreen
 from textual.widgets import Button, Collapsible, DataTable, Footer, Input, Label, Select, Static, TabbedContent, TabPane
 
-from network import connect, send, save_session, load_session, default_session_path, session_data
-from websockets.exceptions import WebSocketException
+from network import (connect, send, save_session, load_session, default_session_path,
+                     available_sessions, claim_session, release_session,
+                     diagnostic_log_path, diagnostic_logger, session_data)
+from websockets.exceptions import InvalidURI, WebSocketException
 from presentation import Model, name, units, amount, reason, clock, effects_text, PURPOSE, SYMBOLS
 
 
@@ -123,6 +127,69 @@ class HelpDialog(ModalScreen):
             yield Button("Back", id="help-back")
 
     def action_back(self):
+        self.dismiss()
+
+
+class JoinDialog(ModalScreen):
+    BINDINGS = [("escape", "back", "Back")]
+
+    def compose(self):
+        with VerticalScroll(id="dialog"):
+            yield Label("Join Game", classes="title")
+            yield Input(placeholder="Room code", id="join-code")
+            yield Static("Enter the room code shared by the host.", id="join-feedback", markup=False)
+            with Horizontal(classes="buttons"):
+                yield Button("Join Game", id="join-confirm", variant="primary")
+                yield Button("Back", id="join-back")
+
+    def action_back(self):
+        self.dismiss()
+
+    @on(Button.Pressed)
+    def pressed(self, event):
+        event.stop()
+        if event.button.id == "join-back":
+            self.dismiss()
+            return
+        code = self.query_one("#join-code", Input).value.strip()
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", code):
+            self.query_one("#join-feedback", Static).update("Enter a valid room code.")
+            return
+        self.app.q("#room", Input).value = code
+        self.dismiss()
+        self.app.begin_connection("join")
+
+
+class SettingsDialog(ModalScreen):
+    BINDINGS = [("escape", "back", "Back")]
+
+    def compose(self):
+        with VerticalScroll(id="dialog"):
+            yield Label("Settings — Advanced", classes="title")
+            yield Label("Server address")
+            yield Input(value=self.app.q("#url", Input).value, id="settings-url")
+            yield Label("Session storage override")
+            yield Input(value=self.app.q("#session", Input).value, id="settings-session")
+            yield Static(f"Sanitized diagnostics: {diagnostic_log_path()}", markup=False)
+            with Horizontal(classes="buttons"):
+                yield Button("Save", id="settings-save", variant="primary")
+                yield Button("Back", id="settings-back")
+
+    def action_back(self):
+        self.dismiss()
+
+    @on(Button.Pressed)
+    def pressed(self, event):
+        event.stop()
+        if event.button.id == "settings-back":
+            self.dismiss()
+            return
+        url = self.query_one("#settings-url", Input).value.strip()
+        path = self.query_one("#settings-session", Input).value.strip()
+        if not url or not path:
+            return
+        self.app.q("#url", Input).value = url
+        self.app.q("#session", Input).value = path
         self.dismiss()
 
     @on(Button.Pressed, "#help-back")
@@ -305,6 +372,7 @@ class EquilibriumApp(App):
     Screen { background: #101923; color: #e4ebef; }
     #status { height: 3; padding: 0 1; background: #203446; color: #b9e4ee; }
     #notice { height: 2; padding: 0 1; color: #ffd080; }
+    #connection-config { display: none; }
     #menu, #lobby, #draft, #results { padding: 1 2; height: 1fr; }
     .title { text-style: bold; color: #91dfb5; margin-bottom: 1; }
     .buttons { height: auto; min-height: 3; layout: horizontal; }
@@ -323,6 +391,7 @@ class EquilibriumApp(App):
         super().__init__()
         self.args = args or SimpleNamespace(url="ws://127.0.0.1:9080", session_file=None, create=False, join=None, rejoin=False)
         self.model = Model()
+        self.model.connection = "Ready"
         self.socket = None
         self.network_task = None
         self.waiters = {}
@@ -330,6 +399,11 @@ class EquilibriumApp(App):
         self.market_key = None
         self.market_rows = {}
         self.pending_foundation = False
+        self.foundation_action_id = None
+        self.foundation_correlation = None
+        self.foundation_choice = None
+        self.foundation_state = "available"
+        self.foundation_feedback = "Choose a Foundation when it is your turn."
         self.entered_game = False
         self.credentials = None
         self.credential_path = None
@@ -337,23 +411,37 @@ class EquilibriumApp(App):
         self.identity = None
         self.persistence_failed = False
         self.connection_generation = 0
+        self.session_lock = None
+        self.connection_attempted = False
+        self.diagnostics = diagnostic_logger()
+        self.resume_candidate = None
+        if self.args.session_file:
+            candidate = Path(self.args.session_file).expanduser()
+            if candidate.is_file():
+                self.resume_candidate = candidate
+        else:
+            candidates = available_sessions()
+            self.resume_candidate = candidates[0] if candidates else None
+        self.default_credential_path = Path(self.args.session_file).expanduser() if self.args.session_file else default_session_path()
 
     def compose(self) -> ComposeResult:
-        yield Static("EQUILIBRIUM | Disconnected", id="status", markup=False)
-        yield Button("Retry Saving Session", id="save-session")
+        yield Static("EQUILIBRIUM | Ready", id="status", markup=False)
+        yield Button("Protect Reconnect", id="save-session")
         yield Static("Build sustainably. Attract residents. Most residents wins.", id="notice", markup=False)
         with VerticalScroll(id="menu"):
-            yield Label("Four cities. One shared population. Twenty minutes to win.", classes="title")
-            yield Input(value=self.args.url, placeholder="Server WebSocket URL", id="url")
-            yield Input(value=self.args.session_file or str(default_session_path()), placeholder="Private session file (keep for reconnecting)", id="session")
-            yield Input(value=self.args.join or "", placeholder="Room code for Join", id="room")
+            yield Label("EQUILIBRIUM", classes="title")
+            yield Static("Four cities. One shared future.", markup=False)
+            with Container(id="connection-config"):
+                yield Input(value=self.args.url, id="url")
+                yield Input(value=str(self.default_credential_path), id="session")
+                yield Input(value=self.args.join or "", id="room")
             with Horizontal(classes="buttons"):
-                yield Button("Create Room", id="create", variant="success")
-                yield Button("Join Room", id="join", variant="primary")
-                yield Button("Reconnect", id="rejoin")
+                yield Button("Create Game", id="create", variant="success")
+                yield Button("Join Game", id="join", variant="primary")
+                yield Button("Continue Match", id="rejoin")
             yield Button("How to Play", id="learn")
+            yield Button("Settings", id="settings")
             yield Button("Exit", id="exit")
-            yield Static("Keep the session-file path to reopen your city. Each instance defaults to a unique file.\nYour city keeps running if you disconnect.", markup=False)
         with VerticalScroll(id="lobby"):
             yield Static("", id="lobby-state", markup=False)
             with Horizontal(classes="buttons"):
@@ -364,6 +452,7 @@ class EquilibriumApp(App):
             yield Static("", id="draft-state", markup=False)
             yield Select([], prompt="Inspect a Foundation", id="foundation")
             yield Static("", id="foundation-detail", markup=False)
+            yield Static("", id="foundation-feedback", markup=False)
             yield Button("Choose Foundation", id="choose", variant="success")
         with Container(id="game"):
             with TabbedContent(id="tabs"):
@@ -430,6 +519,7 @@ class EquilibriumApp(App):
         for row in range(6):
             grid.add_row(*["." for _ in range(6)], key=str(row), label=str(row + 1))
         self.q("#market-table", DataTable).add_columns("Ref", "City / Parties", "Service", "Rate", "Price", "Window / State")
+        self.q("#rejoin", Button).display = self.resume_candidate is not None
         self.show("menu")
         if self.args.create or self.args.join or self.args.rejoin:
             self.run_worker(self.open_connection("rejoin" if self.args.rejoin else "join" if self.args.join else "create"), exclusive=True, group="connect")
@@ -437,6 +527,22 @@ class EquilibriumApp(App):
     def show(self, section):
         for item in ("menu", "lobby", "draft", "game", "results"):
             self.q("#" + item).display = item == section
+        self.diagnostics.info("screen_transition screen=%s", section)
+
+    def begin_connection(self, mode):
+        if mode == "rejoin" and self.resume_candidate is not None:
+            self.q("#session", Input).value = str(self.resume_candidate)
+        elif mode in ("create", "join") and Path(self.q("#session", Input).value).exists():
+            self.q("#session", Input).value = str(default_session_path())
+        self.connection_attempted = True
+        self.set_connection_controls(True)
+        self.run_worker(self.open_connection(mode), exclusive=True, group="connect")
+
+    def set_connection_controls(self, disabled):
+        if not self.is_mounted or not self.screen_stack:
+            return
+        for selector in ("#create", "#join", "#rejoin"):
+            self.q(selector, Button).disabled = disabled
 
     def session_identity(self):
         return (self.identity, self.model.view.get("match_id"))
@@ -474,6 +580,11 @@ class EquilibriumApp(App):
         self.market_rows = {}
         self.tile = 0
         self.pending_foundation = False
+        self.foundation_action_id = None
+        self.foundation_correlation = None
+        self.foundation_choice = None
+        self.foundation_state = "available"
+        self.foundation_feedback = "Choose a Foundation when it is your turn."
         self.identity = None
         table = self.q("#market-table", DataTable)
         table.clear()
@@ -482,11 +593,16 @@ class EquilibriumApp(App):
     def persist_credentials(self):
         try:
             save_session(self.credential_path, self.credentials)
-        except (OSError, ValueError):
+        except (OSError, ValueError) as exc:
             self.persistence_failed = True
-            self.model.note("Session save failed. Keep this app open and retry saving; restart recovery is not safe.")
+            self.model.note("Your session is active, but reconnect protection could not be saved.")
+            self.diagnostics.warning("session_save_failed error=%s", type(exc).__name__)
         else:
             self.persistence_failed = False
+            self.resume_candidate = Path(self.credential_path)
+            if self.is_mounted and self.screen_stack:
+                self.q("#rejoin", Button).display = True
+            self.diagnostics.info("session_saved")
 
     def fail_waiters(self, generation, message):
         for correlation, (owner, future) in list(self.waiters.items()):
@@ -516,11 +632,18 @@ class EquilibriumApp(App):
     async def open_connection(self, mode):
         url = self.q("#url", Input).value.strip()
         path = str(Path(self.q("#session", Input).value.strip()).expanduser().absolute())
-        previous = (self.endpoint, self.credential_path, self.identity, self.credentials)
+        previous = (self.endpoint, self.credential_path, self.identity, self.credentials, self.session_lock)
         same = mode == "rejoin" and url == self.endpoint and path == self.credential_path
         socket = None
         committed = False
+        generation = None
+        candidate_lock = self.session_lock if same else None
+        claimed_here = False
+        self.diagnostics.info("connection_attempt mode=%s", mode)
         try:
+            if candidate_lock is None:
+                candidate_lock = claim_session(path)
+                claimed_here = True
             saved = (self.credentials if same and self.credentials else load_session(path)) if mode == "rejoin" else None
             if mode != "rejoin" and Path(path).exists():
                 raise ValueError("That session file already exists. Reconnect, or choose a new path.")
@@ -538,6 +661,7 @@ class EquilibriumApp(App):
                 await asyncio.gather(old_task, return_exceptions=True)
             self.fail_waiters(old_generation, "Connection changed; request a new preview.")
             self.model.connection = "Connecting"
+            self.model.note("Connecting to the game server…")
             self.model.view_fresh = False
             self.refresh_view()
             socket = await connect(url, max_size=1048576, proxy=None, open_timeout=5, close_timeout=1)
@@ -549,7 +673,7 @@ class EquilibriumApp(App):
                 return
             if greeting.get("type") != "welcome":
                 raise ValueError("Server did not accept protocol negotiation.")
-            self.model.connection = "Rejoining" if mode == "rejoin" else "Joining"
+            self.model.connection = "Rejoining" if mode == "rejoin" else "Creating room" if mode == "create" else "Joining room"
             self.refresh_view()
             if mode == "rejoin":
                 await send(socket, "rejoin", **saved)
@@ -561,7 +685,9 @@ class EquilibriumApp(App):
                 if generation != self.connection_generation:
                     return
                 if assigned["type"] == "protocol_error":
-                    raise ValueError(reason(assigned.get("code", "unknown")))
+                    code = assigned.get("code", "unknown")
+                    self.diagnostics.info("connection_rejected mode=%s code=%s", mode, code)
+                    raise ConnectionError(reason(code))
                 if assigned["type"] == "seat_assigned":
                     break
                 pending_messages.append(assigned)
@@ -572,6 +698,11 @@ class EquilibriumApp(App):
                 self.reset_session()
             self.endpoint, self.credential_path, self.identity = url, path, identity
             self.credentials = session_data(assigned)
+            old_lock = self.session_lock
+            self.session_lock = candidate_lock
+            candidate_lock = None
+            if old_lock != self.session_lock:
+                release_session(old_lock)
             committed = True
             self.persistence_failed = False
             self.socket = socket
@@ -587,45 +718,68 @@ class EquilibriumApp(App):
             if generation != self.connection_generation or self.socket is not active_socket:
                 return
             self.network_task = asyncio.create_task(self.receive(active_socket, path, generation))
+            self.diagnostics.info("connection_authenticated mode=%s seat=%s", mode, assigned["seat"])
         except asyncio.CancelledError:
-            if 'generation' in locals() and generation == self.connection_generation:
+            if generation is not None and generation == self.connection_generation:
                 if not committed:
-                    self.endpoint, self.credential_path, self.identity, self.credentials = previous
-                    self.model.connection = "Disconnected — previous session preserved for reconnect"
+                    self.endpoint, self.credential_path, self.identity, self.credentials, self.session_lock = previous
+                    self.model.connection = "Ready"
                 else:
-                    self.model.connection = "Disconnected — authenticated session preserved for reconnect"
+                    self.model.connection = "Connection interrupted"
             raise
-        except (OSError, ValueError, asyncio.TimeoutError, WebSocketException, PacketError):
-            if 'generation' in locals() and generation == self.connection_generation:
-                if not committed:
-                    self.endpoint, self.credential_path, self.identity, self.credentials = previous
-                    self.model.connection = "Disconnected — previous session preserved for reconnect"
-                    self.model.note("Connection or session failed. Previous session data was preserved.")
-                else:
-                    self.model.connection = "Disconnected — authenticated session preserved for reconnect"
-                    self.model.note("Connection failed after authentication. The rotated session credential was preserved.")
-                    if self.socket is not None:
-                        await self.socket.close()
-                        self.socket = None
-            elif 'generation' not in locals():
-                self.model.note("Connection or session failed. Existing session data was preserved.")
+        except asyncio.TimeoutError:
+            self.diagnostics.warning("connection_failed mode=%s error=timeout", mode)
+            await self._connection_failed(previous, committed, "The game server took too long to respond. Try again.")
+        except InvalidURI:
+            self.diagnostics.warning("connection_failed mode=%s error=invalid_address", mode)
+            await self._connection_failed(previous, committed, "The configured server address is invalid. Check Settings.")
+        except ConnectionError as exc:
+            await self._connection_failed(previous, committed, str(exc) or "The server rejected the request.")
+        except OSError as exc:
+            self.diagnostics.warning("connection_failed mode=%s error=%s", mode, type(exc).__name__)
+            await self._connection_failed(previous, committed, "Cannot connect to the game server. Check your connection and try again.")
+        except (WebSocketException, PacketError, ValueError) as exc:
+            self.diagnostics.warning("connection_failed mode=%s error=%s", mode, type(exc).__name__)
+            message = "The server returned an incompatible response. Check Settings for diagnostics." if isinstance(exc, PacketError) else str(exc) or "The connection was rejected."
+            await self._connection_failed(previous, committed, message)
+        except Exception as exc:
+            self.diagnostics.error("unexpected_connection_error mode=%s error=%s stack=%s", mode,
+                                   type(exc).__name__, " | ".join(traceback.format_tb(exc.__traceback__)))
+            await self._connection_failed(previous, committed, "An unexpected client error occurred. See Settings for diagnostics.")
         finally:
             if socket is not None:
                 await socket.close()
+            if claimed_here:
+                release_session(candidate_lock)
         self.refresh_view()
+        if self.model.connection != "Connected":
+            self.set_connection_controls(False)
+
+    async def _connection_failed(self, previous, committed, message):
+        if not committed:
+            self.endpoint, self.credential_path, self.identity, self.credentials, self.session_lock = previous
+            self.model.connection = "Connection failed"
+        else:
+            self.model.connection = "Connection interrupted"
+            if self.socket is not None:
+                await self.socket.close()
+                self.socket = None
+        self.model.note(message)
 
     async def receive(self, socket, path, generation):
         try:
             async for raw in socket:
                 try:
                     m = parse_packet(raw)
-                except PacketError:
+                except PacketError as exc:
                     if generation == self.connection_generation:
+                        self.diagnostics.warning("invalid_server_packet error=%s", str(exc))
                         self.model.note("Unexpected server data; last valid display retained.")
                         self.refresh_view()
                     continue
                 if generation != self.connection_generation or self.socket is not socket:
                     return
+                self._handle_message_diagnostics(m)
                 correlation = m.get("correlation_id")
                 waiter = self.waiters.get(correlation)
                 if waiter and waiter[0] == generation:
@@ -649,30 +803,88 @@ class EquilibriumApp(App):
                     self.market_key = None
                     self.market_rows.clear()
                     self.q("#market-table", DataTable).clear()
-                self.model.ingest(m, self.session_identity())
+                self._handle_foundation_message(m)
+                if not (m["type"] == "action_ack" and m.get("action_id") == self.foundation_action_id):
+                    self.model.ingest(m, self.session_identity())
                 if m["type"] == "protocol_error" and m.get("code") == "authentication_failed":
                     self.invalidate_dialog()
                     await socket.close()
-                if m["type"] in ("draft_state", "action_ack", "protocol_error"):
-                    self.pending_foundation = False
                 if m["type"] == "match_cancelled":
                     self.show("menu")
+                    self.set_connection_controls(False)
                 if m["type"] == "catalogue":
                     selection = self.q("#foundation", Select)
                     selection.set_options([(name(k), k) for k in m["foundations"]])
+                if m["type"] == "player_view" and not self.entered_game and isinstance(self.screen, ModalScreen):
+                    self.pop_screen()
                 self.refresh_view()
-        except (OSError, WebSocketException):
-            self.model.note("Connection lost. Your city continues operating; displayed data may be outdated.")
+        except (OSError, WebSocketException) as exc:
+            self.diagnostics.warning("connection_lost error=%s", type(exc).__name__)
+            self.model.note("Connection lost. Reconnect to continue.")
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.diagnostics.error("unexpected_receive_error error=%s stack=%s", type(exc).__name__,
+                                   " | ".join(traceback.format_tb(exc.__traceback__)))
+            self.model.note("An unexpected client error interrupted the connection. See Settings for diagnostics.")
         finally:
             await socket.close()
             if generation == self.connection_generation and self.socket is socket:
                 self.socket = None
-                self.model.connection = "Disconnected — displayed information may be stale"
+                self.model.connection = "Connection interrupted"
                 self.model.recent = None
                 self.model.view_fresh = False
+                if self.foundation_state == "submitting":
+                    self.foundation_state = "interrupted"
+                    self.foundation_feedback = "Connection interrupted while selecting. Reconnect to confirm the authoritative result."
                 self.invalidate_dialog()
                 self.fail_waiters(generation, "Connection lost. Reconnect to recover authoritative receipts.")
                 self.refresh_view()
+
+    def _handle_message_diagnostics(self, message):
+        kind = message["type"]
+        if kind == "lobby_created":
+            self.diagnostics.info("room_created")
+        elif kind == "lobby_state":
+            self.diagnostics.info("lobby_state phase=%s revision=%s", message.get("phase"), message.get("lobby_rev"))
+        elif kind == "draft_state":
+            chosen = sum(choice is not None for choice in message.get("choices", []))
+            self.diagnostics.info("draft_state choices=%s turn=%s", chosen, message.get("turn_seat"))
+        elif kind == "match_started":
+            self.diagnostics.info("match_started")
+        elif kind == "protocol_error":
+            self.diagnostics.info("protocol_error code=%s", message.get("code"))
+
+    def _handle_foundation_message(self, message):
+        kind = message["type"]
+        if kind == "action_ack" and message.get("action_id") == self.foundation_action_id:
+            status = message.get("status")
+            if status == "applied":
+                self.foundation_state = "confirmed"
+                self.foundation_feedback = f"{name(self.foundation_choice)} selected. Waiting for the draft to continue."
+            else:
+                self.foundation_state = "rejected"
+                self.foundation_feedback = reason(status)
+                self.pending_foundation = False
+            self.model.note(self.foundation_feedback, ("foundation", self.foundation_action_id, status))
+            self.diagnostics.info("foundation_receipt status=%s", status)
+        elif kind == "protocol_error" and message.get("correlation_id") == self.foundation_correlation:
+            self.foundation_state = "rejected"
+            self.foundation_feedback = reason(message.get("code", "unknown"))
+            self.pending_foundation = False
+            self.diagnostics.info("foundation_rejected code=%s", message.get("code"))
+        elif kind == "draft_state":
+            choices = message.get("choices", [])
+            if isinstance(self.model.seat, int) and self.model.seat < len(choices) and choices[self.model.seat]:
+                self.foundation_choice = choices[self.model.seat]
+                self.foundation_state = "confirmed"
+                self.pending_foundation = False
+                self.foundation_feedback = f"{name(self.foundation_choice)} selected. Waiting for other players."
+        elif kind == "match_started":
+            self.foundation_state = "starting"
+            self.foundation_feedback = "Draft complete. Starting match…"
+        elif kind == "player_view":
+            self.foundation_state = "complete"
 
     async def wire(self, message_type, **payload):
         if not self.socket or self.model.connection != "Connected" or self.model.seat is None:
@@ -732,6 +944,8 @@ class EquilibriumApp(App):
 
     async def on_unmount(self):
         await self.disconnect()
+        release_session(self.session_lock)
+        self.session_lock = None
 
     @on(Select.Changed, "#foundation")
     def foundation_changed(self):
@@ -768,13 +982,18 @@ class EquilibriumApp(App):
     async def button(self, event):
         key = event.button.id
         try:
-            if key in ("create", "join", "rejoin", "game-rejoin"):
-                self.run_worker(self.open_connection("rejoin" if key in ("rejoin", "game-rejoin") else key), exclusive=True, group="connect")
+            if key == "create":
+                self.begin_connection("create")
+            elif key == "join":
+                self.push_screen(JoinDialog())
+            elif key in ("rejoin", "game-rejoin"):
+                self.begin_connection("rejoin")
             elif key == "exit":
                 self.exit()
             elif key in ("leave", "game-menu", "result-menu"):
                 await self.disconnect()
                 self.show("menu")
+                self.set_connection_controls(False)
                 self.q("#notice", Static).update("Disconnected. Reconnect with the same session file to resume an existing match.")
             elif key == "save-session":
                 if self.credentials:
@@ -782,6 +1001,8 @@ class EquilibriumApp(App):
                     self.refresh_view()
             elif key == "learn":
                 self.action_help()
+            elif key == "settings":
+                self.push_screen(SettingsDialog())
             elif key == "ready":
                 rows = self.model.lobby.get("seats", [])
                 mine = next((r for r in rows if r["seat"] == self.model.seat), {})
@@ -792,7 +1013,24 @@ class EquilibriumApp(App):
                 selected = self.q("#foundation", Select).value
                 if selected in self.model.draft.get("available_foundations", []):
                     self.pending_foundation = True
-                    await self.wire("choose_foundation", action_id=uuid.uuid4().hex, foundation=selected)
+                    self.foundation_choice = selected
+                    self.foundation_action_id = uuid.uuid4().hex
+                    self.foundation_correlation = uuid.uuid4().hex
+                    self.foundation_state = "submitting"
+                    self.foundation_feedback = f"Submitting {name(selected)}…"
+                    self.diagnostics.info("foundation_submit seat=%s", self.model.seat)
+                    self.refresh_draft()
+                    try:
+                        await self.wire("choose_foundation", correlation_id=self.foundation_correlation,
+                                        action_id=self.foundation_action_id, foundation=selected)
+                    except ConnectionError:
+                        self.foundation_state = "interrupted"
+                        self.foundation_feedback = "Connection interrupted while selecting. Reconnect to confirm the result."
+                        raise
+                    self.refresh_draft()
+                else:
+                    self.foundation_state = "rejected"
+                    self.foundation_feedback = "That Foundation is no longer available. Choose another."
                     self.refresh_draft()
             elif key == "retry":
                 record = next(((aid, r) for aid, r in self.model.actions.items()
@@ -842,12 +1080,32 @@ class EquilibriumApp(App):
         draft = self.model.draft
         choices = draft.get("choices", [])
         turn = draft.get("turn_seat", -1)
-        lines = [f"Your city: {(self.model.seat or 0)+1}. " + ("Your turn." if turn==self.model.seat else f"Waiting for City {turn+1}.")]
+        if self.model.connection != "Connected":
+            state = "Connection interrupted. Reconnect to continue the draft."
+        elif self.foundation_state == "starting":
+            state = "Draft complete. Starting match…"
+        elif turn == -1:
+            state = "All Foundations selected. Starting match…"
+        elif turn == self.model.seat:
+            state = "Your turn. Choose one available Foundation."
+        elif isinstance(self.model.seat, int) and self.model.seat < len(choices) and choices[self.model.seat]:
+            state = f"{name(choices[self.model.seat])} confirmed. Waiting for City {turn+1}."
+        else:
+            state = f"Waiting for City {turn+1} to choose."
+        lines = [f"Your city: {(self.model.seat or 0)+1}. {state}"]
         lines += [f"City {i+1}: {name(choice) if choice else 'Not selected'}" for i,choice in enumerate(choices)]
+        available = set(draft.get("available_foundations", []))
+        lines.append("Foundations: " + " | ".join(
+            f"{name(card)} ({'Available' if card in available else 'Unavailable'})"
+            for card in self.model.catalogue.get("foundations", {})
+        ))
         lines.append("Disconnected humans retain their choice opportunity during the server grace period; expiry cancels the draft.")
         self.q("#draft-state", Static).update("\n".join(lines))
+        self.q("#foundation-feedback", Static).update(self.foundation_feedback)
         selected = self.q("#foundation", Select).value
-        self.q("#choose", Button).disabled = self.pending_foundation or turn != self.model.seat or selected not in draft.get("available_foundations", []) or self.model.connection != "Connected"
+        button = self.q("#choose", Button)
+        button.label = "Submitting…" if self.foundation_state == "submitting" else "Foundation Confirmed" if self.foundation_state in ("confirmed", "starting", "complete") else "Choose Foundation"
+        button.disabled = self.pending_foundation or turn != self.model.seat or selected not in available or self.model.connection != "Connected"
 
     def refresh_view(self):
         m = self.model
@@ -858,7 +1116,7 @@ class EquilibriumApp(App):
             notice += "\n" + WARNINGS.get(conditions[0]["condition"],name(conditions[0]["condition"]))
         self.q("#save-session", Button).display = self.persistence_failed
         if self.persistence_failed:
-            notice = "SESSION NOT SAVED — keep this app open; retry saving before exiting.\n" + notice
+            notice = "RECONNECT PROTECTION NOT SAVED — keep this app open and choose Protect Reconnect.\n" + notice
         self.q("#notice", Static).update(notice)
         self.q("#history", Static).update("PENDING ACTIONS\n" + "\n".join(r["label"]+": "+reason(r["status"]) for r in m.actions.values() if r["status"] in ("sent","queued","uncertain")) + "\n\nRECENT EVENTS\n" + "\n".join(m.history))
         c = m.view.get("own_city", {})
@@ -904,7 +1162,7 @@ class EquilibriumApp(App):
                 labels={"air_percent":"Effective air % of stock","household_percent":"Household waste % of normal","factory_percent":"Factory waste % of normal","commerce_percent":"Commerce waste % of normal","municipal_E":"Municipal electricity E","uncollected_penalty_micro":"Street waste penalty per unit"}
                 events.append("; ".join(f"{labels[k]}: {units(v) if k.endswith('micro') else v}" for k,v in e.get("modifiers",{}).items() if k in labels))
             self.q("#events", Static).update("\n".join(events))
-        elif m.draft and m.lobby.get("phase") == "draft":
+        elif m.draft and m.lobby.get("phase") in ("draft", "running"):
             self.show("draft"); self.refresh_draft()
         elif m.lobby:
             self.show("lobby")

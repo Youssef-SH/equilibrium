@@ -34,7 +34,7 @@ godot --headless --path . --script tests/integration/local_protocol.gd
 
 ## Online multiplayer
 
-The [server checks](../server/README.md#checks) cover protocol/schema agreement, authorization, scheduling, recursive player-view privacy, draft disconnect recovery, a complete marketplace settlement, real socket fixtures for all four human/bot occupancy combinations, and the terminal CLI. The [interactive client checks](../client/terminal/README.md#focused-checks) additionally exercise authenticated read-only previews, formatting, form stability and actual TUI controls over loopback sockets. Fixture-based final-results rendering is distinct from completing a live match. The complete injected-clock application test is a separate, longer check. Full-duration completion over continuously connected sockets is not accelerated through the public protocol.
+The [server checks](../server/README.md#checks) cover protocol/schema agreement, authorization, scheduling, recursive player-view privacy, draft disconnect recovery, a complete marketplace settlement, real socket fixtures for all four human/bot occupancy combinations, and the terminal CLI. The [interactive client checks](../client/terminal/README.md#focused-checks) additionally exercise authenticated read-only previews, formatting, form stability, actual TUI controls over loopback sockets, and a two-TUI create/join/draft/gameplay/reconnect acceptance path. Fixture-based final-results rendering is distinct from completing a live match. The complete injected-clock application test is a separate, longer check. Full-duration completion over continuously connected sockets is not accelerated through the public protocol.
 
 ## Clean import
 

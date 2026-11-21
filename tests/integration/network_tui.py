@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"client/terminal"))
-from tui import EquilibriumApp, ActionDialog
+from tui import EquilibriumApp, ActionDialog, JoinDialog
 from textual.widgets import Button, Select, Input, DataTable, TabbedContent, Static
 from network_authority import peer, safe
 from presentation import units
@@ -151,8 +151,10 @@ async def quotes_scenario(url,directory):
     code=(await host.wait("lobby_created"))["join_code"]
     try:
         async with app.run_test(size=(80,24)) as pilot:
-            app.q("#room",Input).value=code
             await press(app,pilot,"#join")
+            await until(lambda:isinstance(app.screen,JoinDialog))
+            app.screen.query_one("#join-code",Input).value=code
+            await press(app,pilot,"#join-confirm")
             await until(lambda:app.model.seat==1 and bool(app.model.catalogue))
             for _ in range(2):
                 p=await peer(url);others.append(p)
@@ -208,7 +210,60 @@ async def quotes_scenario(url,directory):
         for p in others:p.ws.close_timeout=.2
         await asyncio.gather(*(p.ws.close() for p in others),return_exceptions=True)
 
-async def main(output, quotes=False):
+
+async def two_tui_scenario(url, directory):
+    """Two independent player UIs complete the authoritative draft and reconnect."""
+    args_a=SimpleNamespace(url=url,session_file=str(directory/"player-a.session.json"),create=False,join=None,rejoin=False)
+    args_b=SimpleNamespace(url=url,session_file=str(directory/"player-b.session.json"),create=False,join=None,rejoin=False)
+    app_a,app_b=EquilibriumApp(args_a),EquilibriumApp(args_b)
+    async with app_a.run_test(size=(90,30)) as pilot_a:
+        async with app_b.run_test(size=(90,30)) as pilot_b:
+            await press(app_a,pilot_a,"#create")
+            await until(lambda:bool(app_a.model.room) and bool(app_a.model.catalogue))
+            await press(app_b,pilot_b,"#join")
+            await until(lambda:isinstance(app_b.screen,JoinDialog))
+            app_b.screen.query_one("#join-code",Input).value=app_a.model.room
+            await press(app_b,pilot_b,"#join-confirm")
+            await until(lambda:app_b.model.seat==1 and bool(app_b.model.catalogue))
+            await press(app_a,pilot_a,"#ready")
+            await press(app_b,pilot_b,"#ready")
+            await until(lambda:not app_a.q("#start",Button).disabled)
+            await press(app_a,pilot_a,"#start")
+            selected=set()
+            while not (app_a.model.view and app_b.model.view):
+                await until(lambda:bool(app_a.model.draft))
+                turn=app_a.model.draft.get("turn_seat",-1)
+                choices=app_a.model.draft.get("choices",[])
+                if turn in (0,1) and turn not in selected and not choices[turn]:
+                    app,pilot=(app_a,pilot_a) if turn==0 else (app_b,pilot_b)
+                    await until(lambda:app.model.draft.get("turn_seat")==turn)
+                    foundation=app.model.draft["available_foundations"][0]
+                    app.q("#foundation",Select).value=foundation
+                    await pilot.pause(.05)
+                    await press(app,pilot,"#choose")
+                    assert app.foundation_state in ("submitting","confirmed","starting","complete")
+                    selected.add(turn)
+                await asyncio.sleep(.03)
+            safe(app_a.model.view,0);safe(app_b.model.view,1)
+            assert app_a.q("#game").display and app_b.q("#game").display
+            assert app_a.foundation_state=="complete" and app_b.foundation_state=="complete"
+            await press(app_a,pilot_a,"#--content-tab-waste-tab")
+            await press(app_a,pilot_a,"#policy")
+            await confirm(app_a,pilot_a,"set_reduce_waste")
+            await press(app_b,pilot_b,"#--content-tab-waste-tab")
+            await press(app_b,pilot_b,"#policy")
+            await confirm(app_b,pilot_b,"set_reduce_waste")
+            before=json.loads(Path(args_b.session_file).read_text())
+            await app_b.socket.close()
+            await until(lambda:app_b.socket is None)
+            await press(app_b,pilot_b,"#game-rejoin")
+            await until(lambda:app_b.socket is not None and app_b.model.connection=="Connected")
+            after=json.loads(Path(args_b.session_file).read_text())
+            assert after["rejoin_token"]!=before["rejoin_token"]
+            assert app_b.model.seat==1 and app_b.q("#game").display
+            print("PASS two TUI players: create, join, ready, authoritative Foundation confirmations, automatic gameplay, actions, secure same-seat reconnect",flush=True)
+
+async def main(output, quotes=False, two_player=False):
     output.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="equilibrium-tui-") as tmp:
         directory=Path(tmp)
@@ -218,7 +273,8 @@ async def main(output, quotes=False):
             process=subprocess.Popen(["godot","--headless","--path",str(ROOT),"--log-file",str(directory/"godot.log"),"--script","server/main.gd","--","--port",str(port),"--stop-file",str(directory/"stop")],stdout=log,stderr=log)
             try:
                 await until(lambda:"ONLINE_READY" in (directory/"server.log").read_text())
-                await asyncio.wait_for((quotes_scenario if quotes else scenario)(f"ws://127.0.0.1:{port}",directory),26)
+                selected = two_tui_scenario if two_player else quotes_scenario if quotes else scenario
+                await asyncio.wait_for(selected(f"ws://127.0.0.1:{port}",directory),35)
                 for name in ("city.svg","waste.svg"):
                     if (directory/name).exists(): (output/name).write_bytes((directory/name).read_bytes())
             finally:
@@ -230,5 +286,6 @@ async def main(output, quotes=False):
 if __name__=="__main__":
     p=argparse.ArgumentParser();p.add_argument("--output",type=Path,default=ROOT/"outputs/tui-preview")
     p.add_argument("--quotes",action="store_true")
+    p.add_argument("--two-player",action="store_true")
     args=p.parse_args()
-    asyncio.run(main(args.output,args.quotes))
+    asyncio.run(main(args.output,args.quotes,args.two_player))

@@ -21,18 +21,18 @@ godot --headless --path . --log-file /tmp/equilibrium-server.log --script server
 Open the interactive menu in another terminal:
 
 ~~~sh
-uv run --locked python client/terminal/client.py --tui --url ws://127.0.0.1:9080 --session-file /tmp/equilibrium-city1.session.json
+uv run --locked python client/terminal/client.py --tui
 ~~~
 
-Choose **Create Room**. Share the displayed room code. Each additional player launches an independent instance with a different session file, enters the code, and chooses **Join Room**:
+Choose **Create Game** and share the displayed room code. Each additional player launches an independent instance, chooses **Join Game**, and enters the code:
 
 ~~~sh
-uv run --locked python client/terminal/client.py --tui --session-file /tmp/equilibrium-city2.session.json
-uv run --locked python client/terminal/client.py --tui --session-file /tmp/equilibrium-city3.session.json
-uv run --locked python client/terminal/client.py --tui --session-file /tmp/equilibrium-city4.session.json
+uv run --locked python client/terminal/client.py --tui
+uv run --locked python client/terminal/client.py --tui
+uv run --locked python client/terminal/client.py --tui
 ~~~
 
-Run those commands in separate terminals. Without --session-file, each instance proposes a unique persistent path in its private per-user application-state directory. Retain that path for reconnecting. Existing session files are protected from accidental reuse when creating or joining a new room; select **Reconnect** or choose a new path.
+Run those commands in separate terminals. Every instance creates and exclusively locks a unique private session file. The path and credential are hidden during ordinary play. `--session-file` remains available for scripted development workflows.
 
 All human players select **Ready**; the host selects **Start Match**. Start with any number from one through four humans. Empty seats become deterministic bots on start. Select an available Foundation when your city’s turn arrives.
 
@@ -54,7 +54,7 @@ Waste quantities are units; waste rates are units/minute. Electricity supply and
 
 ## Reconnect and server lifecycle
 
-Choose **Reconnect** after connection loss, or reopen the same private session:
+Choose **Reconnect** after connection loss. After restarting the client, choose **Continue Match**; the server verifies whether the newest unclaimed saved session is still resumable. A scripted developer can target a specific saved session:
 
 ~~~sh
 uv run --locked python client/terminal/client.py --tui --url ws://127.0.0.1:9080 --rejoin --session-file /tmp/equilibrium-city1.session.json
@@ -78,7 +78,7 @@ On another machine, replace SERVER_LAN_IP with the host’s actual LAN address:
 uv run --locked python client/terminal/client.py --tui --url ws://SERVER_LAN_IP:9080 --session-file /tmp/equilibrium-lan.session.json
 ~~~
 
-Permit the chosen port through the host firewall. The URL field also accepts wss:// endpoints; TLS termination is an external server responsibility. LAN, WSS and independent-network operation require separate acceptance testing. Loopback tests do not establish those capabilities end to end.
+Permit the chosen port through the host firewall. **Settings → Advanced** accepts `ws://` and `wss://` endpoints; TLS termination is an external server responsibility. LAN, WSS and independent-network operation require separate acceptance testing. Loopback tests do not establish those capabilities end to end.
 
 ## Scripted client
 
@@ -107,7 +107,12 @@ godot --headless --path . --log-file /tmp/equilibrium-presentation-tests.log --s
 uv sync --locked --group test
 uv run --locked --group test python -m unittest discover -s tests/integration -p test_terminal_tui.py -v
 uv run --locked --group test python tests/integration/network_tui.py
+uv run --locked --group test python tests/integration/network_tui.py --two-player
 uv run --locked --group test python tests/integration/network_tui.py --quotes
+uv run --locked --group test python tests/integration/network_authority.py --humans 1
+uv run --locked --group test python tests/integration/network_authority.py --humans 2
+uv run --locked --group test python tests/integration/network_authority.py --humans 4
+uv run --locked --group test python tests/integration/network_authority.py --draft-disconnect
 uv run --locked --group test python tests/integration/network_authority.py --terminal
 uv run --locked python tools/check_repository.py
 ~~~
@@ -154,14 +159,15 @@ uv run --locked python client/terminal/client.py --tui
 
 Each TUI defaults to a unique persistent session file in `equilibrium` under
 `$XDG_STATE_HOME` (or `~/.local/state`) on Linux, and Local AppData on Windows.
-Keep the displayed path for later reconnects; explicit `--session-file` paths
-still work. Session writes use a same-directory temporary file, `os.fchmod(0600)`,
+The client discovers unclaimed files for **Continue Match** and uses an exclusive
+lock to prevent two local processes from opening the same credential. Explicit
+`--session-file` paths still work. Session writes use a same-directory temporary file, `os.fchmod(0600)`,
 flush/fsync and atomic replacement. New application directories use mode 0700.
 Windows ACLs determine access; file mode 0600 alone is not a Unix-equivalent
 privacy guarantee. Avoid shared or untrusted directories for explicit paths.
 
-A save failure retains the current credential in memory and displays a persistent
-Retry Saving Session button. Keep the application open until saving succeeds.
+A save failure retains the current credential in memory and displays a concise
+**Protect Reconnect** recovery action. Keep the application open until saving succeeds.
 Reconnect in that instance uses the current in-memory credential. A crash between
 server token rotation and durable local saving can still lose recovery access:
 the protocol invalidates the old token immediately. It does not keep old tokens
@@ -173,3 +179,13 @@ marked stale after disconnect; the city keeps simulating. Pending actions keep
 their original IDs and can only be retried in the same authenticated match.
 A queued receipt is not an executed receipt. Help (F1) returns with Escape without
 changing the current screen or selection. Previews are checks, never reservations.
+
+Sanitized lifecycle diagnostics are written to
+`$XDG_STATE_HOME/equilibrium/client-diagnostics.log` or
+`~/.local/state/equilibrium/client-diagnostics.log`. The log records connection,
+lobby, draft, match and screen transitions without session tokens or message
+payloads. View it on Linux/WSL with:
+
+```bash
+tail -n 100 "${XDG_STATE_HOME:-$HOME/.local/state}/equilibrium/client-diagnostics.log"
+```

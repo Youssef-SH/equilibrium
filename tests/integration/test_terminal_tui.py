@@ -7,13 +7,17 @@ from pathlib import Path
 import sys
 import unittest
 import tempfile
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch, ANY
+from websockets.exceptions import InvalidURI
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "client/terminal"))
 from presentation import Model, units, amount, reason
-from network import envelope, save_session, load_session, default_session_path
-from tui import EquilibriumApp, ActionDialog, parse_packet, PacketError
+from network import (envelope, save_session, load_session, default_session_path,
+                     claim_session, release_session)
+from tui import (EquilibriumApp, ActionDialog, JoinDialog, SettingsDialog,
+                 parse_packet, PacketError)
 from jsonschema import Draft202012Validator
 from network_authority import safe
 from textual.widgets import Button, Input, Select, Static, TabbedContent, DataTable
@@ -349,6 +353,18 @@ class ReliabilityTests(unittest.TestCase):
             app.persist_credentials()
         self.assertFalse(app.persistence_failed)
 
+    def test_session_claim_prevents_local_credential_collision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "seat.session.json"
+            lock = claim_session(path)
+            try:
+                with self.assertRaisesRegex(ValueError, "already open"):
+                    claim_session(path)
+            finally:
+                release_session(lock)
+            second = claim_session(path)
+            release_session(second)
+
 
 class ReliabilityUITests(unittest.IsolatedAsyncioTestCase):
     fixture_app = UITests.fixture_app
@@ -362,6 +378,102 @@ class ReliabilityUITests(unittest.IsolatedAsyncioTestCase):
             if not self.messages: raise StopAsyncIteration
             return self.messages.pop(0)
         async def close(self): self.closed = True
+
+    async def test_player_menu_hides_connection_details(self):
+        app = EquilibriumApp()
+        async with app.run_test(size=(80, 24)) as pilot:
+            self.assertIn("Ready", str(app.q("#status", Static).content))
+            self.assertFalse(app.q("#connection-config").display)
+            self.assertEqual(str(app.q("#create", Button).label), "Create Game")
+            app.q("#join", Button).press(); await pilot.pause()
+            self.assertIsInstance(app.screen, JoinDialog)
+            await pilot.press("escape")
+            app.q("#settings", Button).press(); await pilot.pause()
+            self.assertIsInstance(app.screen, SettingsDialog)
+
+    async def test_foundation_submission_confirmation_rejection_and_game_transition(self):
+        fixture = json.loads(FIXTURE.read_text())
+        app = EquilibriumApp()
+        app.model.catalogue = fixture["catalogue"]
+        app.model.connection = "Connected"
+        app.model.seat = 0
+        app.model.lobby = {"phase":"draft", "host_seat":0, "seats":[]}
+        app.model.draft = {"choices":[None,None,None,None], "turn_seat":0,
+                           "available_foundations":list(fixture["catalogue"]["foundations"])}
+        app.wire = AsyncMock(return_value="sent")
+        async with app.run_test(size=(80, 24)) as pilot:
+            app.q("#foundation", Select).set_options([(key, key) for key in fixture["catalogue"]["foundations"]])
+            app.refresh_view()
+            app.q("#foundation", Select).value = "circular_foundation"
+            await pilot.pause()
+            app.q("#choose", Button).press(); await pilot.pause()
+            self.assertEqual(app.foundation_state, "submitting")
+            self.assertTrue(app.pending_foundation)
+            self.assertIn("Submitting Circular", str(app.q("#foundation-feedback", Static).content))
+            app._handle_foundation_message({"type":"action_ack", "action_id":app.foundation_action_id,
+                                            "phase":"admission", "status":"applied"})
+            self.assertEqual(app.foundation_state, "confirmed")
+            update = {"type":"draft_state", "choices":["circular_foundation",None,None,None],
+                      "turn_seat":1, "available_foundations":["industrial_legacy","energy_pioneer","investment_district"]}
+            app._handle_foundation_message(update); app.model.ingest(update); app.refresh_view()
+            self.assertFalse(app.pending_foundation)
+            self.assertIn("Waiting for City 2", str(app.q("#draft-state", Static).content))
+            app.foundation_action_id = "rejected"
+            app.pending_foundation = True
+            app._handle_foundation_message({"type":"action_ack", "action_id":"rejected",
+                                            "phase":"admission", "status":"foundation_taken"})
+            self.assertEqual(app.foundation_state, "rejected")
+            self.assertIn("no longer available", app.foundation_feedback)
+            app._handle_foundation_message({"type":"match_started"})
+            app.model.lobby["phase"] = "running"; app.refresh_view()
+            self.assertIn("Starting match", str(app.q("#draft-state", Static).content))
+            app._handle_foundation_message(fixture["view"])
+            app.model.ingest(fixture["view"]); app.refresh_view()
+            self.assertTrue(app.q("#game").display)
+
+    async def test_foundation_delayed_send_remains_visibly_pending(self):
+        fixture = json.loads(FIXTURE.read_text())
+        app = EquilibriumApp()
+        app.model.catalogue = fixture["catalogue"]
+        app.model.connection = "Connected"; app.model.seat = 0
+        app.model.lobby = {"phase":"draft", "host_seat":0, "seats":[]}
+        app.model.draft = {"choices":[None,None,None,None], "turn_seat":0,
+                           "available_foundations":list(fixture["catalogue"]["foundations"])}
+        sent = asyncio.get_running_loop().create_future()
+        async def delayed_wire(*args, **kwargs):
+            return await sent
+        app.wire = delayed_wire
+        async with app.run_test(size=(80,24)) as pilot:
+            app.q("#foundation",Select).set_options([(key,key) for key in fixture["catalogue"]["foundations"]])
+            app.refresh_view(); app.q("#foundation",Select).value="industrial_legacy"; await pilot.pause()
+            task=asyncio.create_task(app.button(SimpleNamespace(button=SimpleNamespace(id="choose"))))
+            await asyncio.sleep(0)
+            self.assertEqual(app.foundation_state,"submitting")
+            self.assertTrue(app.q("#choose",Button).disabled)
+            sent.set_result("sent")
+            await task
+
+    async def test_server_unavailable_has_actionable_message(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = type("Args", (), dict(url="ws://127.0.0.1:9", session_file=str(Path(directory)/"seat.session.json"), create=False, join=None, rejoin=False))()
+            app = EquilibriumApp(args)
+            async with app.run_test(size=(80, 24)):
+                with patch("tui.connect", AsyncMock(side_effect=OSError("refused"))):
+                    await app.open_connection("create")
+                self.assertIn("Cannot connect to the game server", app.model.history[-1])
+                self.assertEqual(app.model.connection, "Connection failed")
+
+    async def test_timeout_and_invalid_address_have_distinct_feedback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = type("Args", (), dict(url="ws://example.invalid", session_file=str(Path(directory)/"seat.session.json"), create=False, join=None, rejoin=False))()
+            app = EquilibriumApp(args)
+            async with app.run_test(size=(80,24)):
+                with patch("tui.connect", AsyncMock(side_effect=asyncio.TimeoutError)):
+                    await app.open_connection("create")
+                self.assertIn("too long", app.model.history[-1])
+                with patch("tui.connect", AsyncMock(side_effect=InvalidURI("bad", "invalid"))):
+                    await app.open_connection("create")
+                self.assertIn("address is invalid", app.model.history[-1])
 
     async def test_receive_validation_and_programming_errors_are_separate(self):
         app = EquilibriumApp()
